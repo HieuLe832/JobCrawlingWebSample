@@ -3,4 +3,6 @@ export const SOURCES = [
   { key: 'topcv', label: 'TopCV' },
   { key: 'topdev', label: 'TopDev' },
   { key: 'vietnamworks', label: 'VietnamWorks' },
+  // Company career sites
+  { key: 'tma', label: 'TMA' },
 ]

@@ -38,6 +38,8 @@ builder.Services.AddSingleton<IJobSource, ItViecSource>();
 builder.Services.AddSingleton<IJobSource, TopCvSource>();
 builder.Services.AddSingleton<IJobSource, TopDevSource>();
 builder.Services.AddSingleton<IJobSource, VietnamWorksSource>();
+// Company career sites
+builder.Services.AddSingleton<IJobSource, TmaSource>();
 builder.Services.AddSingleton<CrawlCoordinator>();
 
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
