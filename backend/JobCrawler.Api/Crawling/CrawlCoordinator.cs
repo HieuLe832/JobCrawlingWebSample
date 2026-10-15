@@ -63,9 +63,9 @@ public class CrawlCoordinator(IEnumerable<IJobSource> sources, IServiceScopeFact
     private async Task RunSourceAsync(IJobSource source, int maxPages, CancellationToken ct)
     {
         var status = _status[source.Name];
+        var batch = new List<RawJob>();
         try
         {
-            var batch = new List<RawJob>();
             await foreach (var job in source.CrawlAsync(maxPages, ct))
             {
                 batch.Add(job);
@@ -83,6 +83,9 @@ public class CrawlCoordinator(IEnumerable<IJobSource> sources, IServiceScopeFact
         {
             logger.LogError(ex, "Crawl of {Source} failed", source.Name);
             lock (_lock) { status.State = "failed"; status.Error = ex.Message; }
+            // Keep what was fetched before the failure.
+            try { await SaveAsync(batch, status, CancellationToken.None); }
+            catch (Exception saveEx) { logger.LogError(saveEx, "Saving partial batch of {Source} failed", source.Name); }
         }
         finally
         {
