@@ -16,7 +16,8 @@ public record Classification(bool IsIt, string Category, string Level, int Score
 ///
 /// Matching rules (each one fixes a real false positive seen in the crawled data):
 ///  - Text is lower-cased and Vietnamese diacritics are removed ("lập trình nhúng" -> "lap trinh nhung").
-///  - Keywords match on word boundaries, so "java" does not hit "javascript".
+///  - Keywords match on word boundaries, so "java" does not hit "javascript"; an optional plural "s" is allowed
+///    ("Software Developers").
 ///  - Longest keywords are matched first and their span is blanked out, so "react native" counts for Mobile only,
 ///    not also for Frontend via "react".
 ///  - Short acronyms (IT, AI, BA, QA, PM, SAP...) are matched case-sensitively on the ORIGINAL text, because once
@@ -32,8 +33,9 @@ public static partial class JobClassifier
     public const string NonIt = "Non-IT";
     public const string OtherIt = "Other IT";
 
-    /// <summary>Sources whose crawled listing is IT-only, so a job is IT even without a keyword hit (unless its title is a non-IT role).</summary>
-    private static readonly HashSet<string> ItOnlySources = ["itviec", "vietnamworks"];
+    /// <summary>Sources whose crawled listing is IT-only, so a job is IT even without a keyword hit (unless its title is a non-IT role).
+    /// TMA / Axon Active / Netcompany are software companies; NAB is a bank, so it is scored like a mixed board.</summary>
+    private static readonly HashSet<string> ItOnlySources = ["itviec", "vietnamworks", "tma", "axonactive", "netcompany"];
 
     private record Keyword(string Category, string Text, bool IsRole, bool Acronym, Regex Regex);
 
@@ -62,11 +64,11 @@ public static partial class JobClassifier
                 "deep learning", "data labeling", "gan nhan du lieu", "phan tich du lieu", "tri tue nhan tao", "data governance",
                 "data quality", "data warehouse", "data analytics", "bi developer", "chuyen vien du lieu", "chuyen gia du lieu",
                 "ky su du lieu"],
-            ["llm", "nlp", "computer vision", "big data", "spark", "etl", "power bi", "tableau", "databricks",
+            ["llm", "nlp", "computer vision", "big data", "spark", "etl", "power bi", "tableau", "databricks", "analytics", "data reporting",
                 "artificial intelligence", "generative ai", "genai", "agentic ai", "pandas", "pytorch", "tensorflow",
                 "hugging face"], ["AI", "ML", "BI"]),
         new("QA/Tester", ["tester", "testing", "test engineer", "automation test", "manual test", "kiem thu", "quality assurance",
-                "quality engineer", "qa engineer", "qc engineer", "kiem soat chat luong phan mem"],
+                "quality engineer", "qa engineer", "qc engineer", "test automation", "kiem soat chat luong phan mem"],
             ["selenium", "cypress", "playwright", "appium", "jmeter", "postman"], ["QA", "QC"]),
         new("Security", ["security", "bao mat", "an ninh mang", "an toan thong tin", "pentest", "penetration", "cyber"],
             ["grc", "iso 27001", "siem", "owasp"], ["SOC"]),
@@ -75,24 +77,25 @@ public static partial class JobClassifier
             ["autosar", "rtos", "microcontroller", "vxworks"], []),
         new("Game", ["game developer", "game designer", "lap trinh game"], ["game", "unity", "unreal", "cocos"], []),
         new("BA/PM/PO", ["business analyst", "business analysis", "system analyst", "phan tich nghiep vu", "phan tich he thong",
-                "product owner", "product manager", "project manager", "scrum master", "brse", "bridge engineer", "it comtor",
+                "product owner", "product manager", "project manager", "scrum master", "brse", "bse", "bridge engineer", "project analyst", "it comtor",
                 "comtor", "delivery manager", "quan ly du an"],
             ["jira", "agile", "scrum"], ["BA", "PM", "PO"]),
         new("UI/UX Design", ["ui/ux", "ux/ui", "ux designer", "ui designer", "web designer", "product designer", "thiet ke giao dien"],
             ["figma"], ["UX", "UI"]),
         new("IT Support/Infra", ["helpdesk", "help desk", "it support", "ho tro ky thuat", "system admin", "system administrator",
                 "sysadmin", "network engineer", "quan tri mang", "quan tri he thong", "dba", "database administrator",
-                "it infrastructure", "data center", "ky thuat it", "it operations", "van hanh co so du lieu", "quan tri co so du lieu"],
+                "it infrastructure", "data center", "end user support", "ky thuat it", "it operations", "van hanh co so du lieu", "quan tri co so du lieu"],
             ["network", "linux", "windows server", "vien thong", "ccna", "vmware"], []),
         new("ERP/Consulting", ["erp", "odoo", "oracle ebs", "dynamics 365", "salesforce", "it consultant", "presales", "pre-sales",
-                "solution architect", "kien truc su giai phap", "sap consultant", "trien khai phan mem"],
+                "solution architect", "solution designer", "kien truc su giai phap", "sap consultant", "trien khai phan mem"],
             ["sap abap", "sap fico"], ["SAP"]),
     ];
 
     /// <summary>Generic IT words: they make a job IT but say nothing about its category.</summary>
     private static readonly string[] GenericIt =
     [
-        "engineer", "lap trinh", "phan mem", "software", "cong nghe thong tin", "tech lead", "sql", "database", "git",
+        "engineer", "engineering", "software engineering", "technology", "technical", "architecture", "lap trinh", "phan mem",
+        "software", "cong nghe thong tin", "tech lead", "technical lead", "sql", "database", "git",
     ];
 
     /// <summary>Generic words that are enough on their own, in a title, to make a job IT ("ServiceNow ITSM Developer").
@@ -108,7 +111,7 @@ public static partial class JobClassifier
     [GeneratedRegex(@"(?<![\p{L}\p{N}])(sales|sale|kinh doanh|ban hang|marketing|ke toan|accountant|accounting|nhan su|" +
                     @"nhan vien tuyen dung|chuyen vien tuyen dung|recruiter|talent acquisition|hr|cham soc khach hang|telesales|b2b|b2c|" +
                     @"graphic design|thiet ke do hoa|hoa vien|thiet ke kien truc|noi that|xay dung|brand|content creator|" +
-                    @"video editor|dung phim|cnc|co khi)(?![\p{L}\p{N}])")]
+                    @"video editor|video designer|copywriter|business development|dung phim|cnc|co khi)(?![\p{L}\p{N}])")]
     private static partial Regex NonItTitleRegex();
 
     private static readonly List<Keyword> Keywords = BuildKeywords();
@@ -245,7 +248,7 @@ public static partial class JobClassifier
     }
 
     private static Regex Word(string pattern) =>
-        new($@"(?<![\p{{L}}\p{{N}}])(?:{pattern})(?![\p{{L}}\p{{N}}])", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        new($@"(?<![\p{{L}}\p{{N}}])(?:{pattern})s?(?![\p{{L}}\p{{N}}])", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     [GeneratedRegex(@"(product|project|delivery|account|brand)\s+manager|quan ly du an|quan ly san pham")]
     private static partial Regex RoleManagerRegex();
