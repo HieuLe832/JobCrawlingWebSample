@@ -40,6 +40,10 @@ builder.Services.AddSingleton<IJobSource, TopDevSource>();
 builder.Services.AddSingleton<IJobSource, VietnamWorksSource>();
 builder.Services.AddSingleton<CrawlCoordinator>();
 
+builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+    p.WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? ["http://localhost:5173"])
+        .AllowAnyHeader().AllowAnyMethod()));
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -51,5 +55,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseCors();
 app.MapControllers();
 app.Run();
