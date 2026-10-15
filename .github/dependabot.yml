@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /backend/JobCrawler.Api
+    schedule:
+      interval: weekly
+    groups:
+      nuget-minor-patch:
+        update-types: [minor, patch]
+    ignore:
+      # EF Core major versions track .NET majors (EF Core 10 needs net10.0); stay on 8.x while targeting net8.0.
+      - dependency-name: "Microsoft.EntityFrameworkCore*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
