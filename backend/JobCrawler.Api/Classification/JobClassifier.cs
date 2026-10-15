@@ -23,6 +23,9 @@ public record Classification(bool IsIt, string Category, string Level, int Score
 ///    lower-cased and stripped of diacritics they collide with Vietnamese words: "ít" -> "it", "ai" ("who") -> "ai",
 ///    "sắp" ("soon") -> "sap". For the same reason "nhưng" ("but") -> "nhung" is never used alone for Embedded,
 ///    and "hạ tầng" is not an IT word (construction jobs use it too).
+///  - IT job boards also list sales / marketing / graphic-design / CNC jobs in their IT category, so a title with a
+///    non-IT role word and no IT role word is Non-IT whatever the source. Careful with prefixes: "Tuyển dụng ..." means
+///    "hiring ...", not an HR job, and "kiến trúc sư hệ thống" is a system architect, not a building architect.
 /// </summary>
 public static partial class JobClassifier
 {
@@ -30,7 +33,7 @@ public static partial class JobClassifier
     public const string OtherIt = "Other IT";
 
     /// <summary>Sources whose crawled listing is IT-only, so a job is IT even without a keyword hit (unless its title is a non-IT role).</summary>
-    private static readonly HashSet<string> ItOnlySources = ["itviec", "topcv", "vietnamworks"];
+    private static readonly HashSet<string> ItOnlySources = ["itviec", "vietnamworks"];
 
     private record Keyword(string Category, string Text, bool IsRole, bool Acronym, Regex Regex);
 
@@ -89,11 +92,24 @@ public static partial class JobClassifier
     /// <summary>Generic IT words: they make a job IT but say nothing about its category.</summary>
     private static readonly string[] GenericIt =
     [
-        "developer", "engineer", "lap trinh", "lap trinh vien", "phan mem", "software", "software engineer", "software developer",
-        "cong nghe thong tin", "programmer", "coder", "tech lead", "sql", "database", "git",
+        "engineer", "lap trinh", "phan mem", "software", "cong nghe thong tin", "tech lead", "sql", "database", "git",
+    ];
+
+    /// <summary>Generic words that are enough on their own, in a title, to make a job IT ("ServiceNow ITSM Developer").
+    /// "engineer" is not one of them: process / civil / sales engineers are common on mixed boards.</summary>
+    private static readonly string[] GenericItRoles =
+    [
+        "developer", "lap trinh vien", "software engineer", "software developer", "programmer", "coder",
     ];
 
     private static readonly string[] GenericItAcronyms = ["IT", "CNTT"];
+
+    /// <summary>Title words of roles that are not IT work even when posted in an IT category.</summary>
+    [GeneratedRegex(@"(?<![\p{L}\p{N}])(sales|sale|kinh doanh|ban hang|marketing|ke toan|accountant|accounting|nhan su|" +
+                    @"nhan vien tuyen dung|chuyen vien tuyen dung|recruiter|talent acquisition|hr|cham soc khach hang|telesales|b2b|b2c|" +
+                    @"graphic design|thiet ke do hoa|hoa vien|thiet ke kien truc|noi that|xay dung|brand|content creator|" +
+                    @"video editor|dung phim|cnc|co khi)(?![\p{L}\p{N}])")]
+    private static partial Regex NonItTitleRegex();
 
     private static readonly List<Keyword> Keywords = BuildKeywords();
 
@@ -109,6 +125,7 @@ public static partial class JobClassifier
 
         var scores = new Dictionary<string, int>();
         var generic = 0;
+        var roleInTitle = false;
 
         foreach (var (text, isTitle, baseWeight) in fields)
         {
@@ -131,7 +148,8 @@ public static partial class JobClassifier
                 else normalized = normalized.Remove(m.Index, m.Length).Insert(m.Index, blank);
 
                 var weight = isTitle && k.IsRole ? 6 : baseWeight;
-        
+                if (isTitle && k.IsRole && k.Category != "") roleInTitle = true;
+
                 if (k.Category == "") generic += weight;
                 else scores[k.Category] = scores.GetValueOrDefault(k.Category) + weight;
             }
@@ -148,8 +166,9 @@ public static partial class JobClassifier
             (scores.GetValueOrDefault("Frontend") >= 4 && scores.GetValueOrDefault("Backend") >= 4 && category is "Frontend" or "Backend"))
             category = "Fullstack";
 
+        var nonItTitle = NonItTitleRegex().IsMatch(Normalize(j.Title)) && !roleInTitle;
         var itScore = scores.Values.Sum() + generic;
-        var isIt = ItOnlySources.Contains(j.Source) || itScore >= 4;
+        var isIt = !nonItTitle && (ItOnlySources.Contains(j.Source) || itScore >= 4);
 
         category = !isIt ? NonIt : category ?? OtherIt;
         return new Classification(isIt, category, DetectLevel(j), best.Score);
@@ -219,6 +238,7 @@ public static partial class JobClassifier
             list.AddRange((r.TechAcronyms ?? []).Select(a => new Keyword(r.Category, a, false, true, Word(Regex.Escape(a)))));
         }
         list.AddRange(GenericIt.Select(w => new Keyword("", w, false, false, Word(Regex.Escape(w)))));
+        list.AddRange(GenericItRoles.Select(w => new Keyword("", w, true, false, Word(Regex.Escape(w)))));
         list.AddRange(GenericItAcronyms.Select(a => new Keyword("", a, false, true, Word(Regex.Escape(a)))));
         // Longest first so multi-word phrases consume their parts.
         return list.OrderByDescending(k => k.Text.Length).ToList();
@@ -227,7 +247,7 @@ public static partial class JobClassifier
     private static Regex Word(string pattern) =>
         new($@"(?<![\p{{L}}\p{{N}}])(?:{pattern})(?![\p{{L}}\p{{N}}])", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    [GeneratedRegex(@"(product|project|delivery|account|brand)\s+manager")]
+    [GeneratedRegex(@"(product|project|delivery|account|brand)\s+manager|quan ly du an|quan ly san pham")]
     private static partial Regex RoleManagerRegex();
 
     [GeneratedRegex(@"(\d+(?:[.,]\d+)?)\s*\+?\s*(?:nam|years?|yoe|yrs)")]
