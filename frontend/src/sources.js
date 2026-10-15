@@ -5,4 +5,5 @@ export const SOURCES = [
   { key: 'vietnamworks', label: 'VietnamWorks' },
   // Company career sites
   { key: 'tma', label: 'TMA' },
+  { key: 'axonactive', label: 'Axon Active' },
 ]
