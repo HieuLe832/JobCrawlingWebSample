@@ -54,6 +54,8 @@ public class PoliteHttpClient(HttpClient http, CrawlerOptions options, ILogger<P
 
             if (res.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone) return null;
             if (res.IsSuccessStatusCode) return await res.Content.ReadAsStringAsync(ct);
+            if (IsBotChallenge(res))
+                throw new HttpRequestException($"{uri.Host} answered with a bot challenge; not crawling it", null, res.StatusCode);
 
             var retryable = res.StatusCode == HttpStatusCode.TooManyRequests || (int)res.StatusCode >= 500;
             if (!retryable || attempt >= 3)
@@ -64,6 +66,9 @@ public class PoliteHttpClient(HttpClient http, CrawlerOptions options, ILogger<P
             await Task.Delay(wait, ct);
         }
     }
+
+    private static bool IsBotChallenge(HttpResponseMessage res) =>
+        res.Headers.TryGetValues("cf-mitigated", out var v) && v.Contains("challenge");
 
     private async Task ThrottleAsync(string host, CancellationToken ct)
     {
@@ -89,6 +94,12 @@ public class PoliteHttpClient(HttpClient http, CrawlerOptions options, ILogger<P
         try
         {
             using var res = await http.GetAsync(origin + "/robots.txt");
+            // A bot challenge (Cloudflare "Just a moment...") is not the site's robots answer: the site is refusing bots.
+            if (IsBotChallenge(res))
+            {
+                logger.LogWarning("robots.txt for {Origin} is behind a bot challenge -> disallow all", origin);
+                return RobotsTxt.DisallowAll;
+            }
             // RFC 9309: 4xx => no restrictions, 5xx/unreachable => assume full disallow.
             if ((int)res.StatusCode is >= 400 and < 500)
             {
