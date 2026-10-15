@@ -1,0 +1,21 @@
+User-Agent: *
+Allow: /
+Disallow: /job-seeker/login
+Disallow: /employers/search
+Disallow: /partners/
+Disallow: /job/getApply
+Disallow: /affiliate/
+Disallow: /challenge/
+Disallow: /topdemy/
+Disallow: /socket.io
+
+User-Agent: Yeti
+Disallow: /
+
+User-Agent: Adsbot-Google
+Allow: /
+
+User-Agent: Googlebot-Mobile
+Allow: /
+
+Sitemap: https://topdev.vn/sitemap.xml
