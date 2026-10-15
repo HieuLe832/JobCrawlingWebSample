@@ -1,5 +1,6 @@
 using System.Net;
 using JobCrawler.Api.Crawling;
+using JobCrawler.Api.Crawling.Sources;
 using JobCrawler.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -32,6 +33,9 @@ builder.Services.AddSingleton(_ =>
 });
 builder.Services.AddSingleton(sp => new PoliteHttpClient(
     sp.GetRequiredService<HttpClient>(), crawlerOptions, sp.GetRequiredService<ILogger<PoliteHttpClient>>()));
+
+builder.Services.AddSingleton<IJobSource, ItViecSource>();
+builder.Services.AddSingleton<CrawlCoordinator>();
 
 var app = builder.Build();
 
