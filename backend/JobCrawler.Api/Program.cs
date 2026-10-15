@@ -37,6 +37,7 @@ builder.Services.AddSingleton(sp => new PoliteHttpClient(
 builder.Services.AddSingleton<IJobSource, ItViecSource>();
 builder.Services.AddSingleton<IJobSource, TopCvSource>();
 builder.Services.AddSingleton<IJobSource, TopDevSource>();
+builder.Services.AddSingleton<IJobSource, VietnamWorksSource>();
 builder.Services.AddSingleton<CrawlCoordinator>();
 
 var app = builder.Build();
