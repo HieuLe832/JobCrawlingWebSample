@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-IT job crawler: crawl IT jobs from 4 Vietnamese job boards (only where robots.txt allows), then classify them.
+IT job crawler: crawl IT jobs from 4 Vietnamese job boards and 4 company career sites (only where robots.txt allows),
+then classify them.
 Scope is deliberately small — two features only: **crawl** and **classify**. Prototype / feasibility check, not production.
 
 ## Stack
@@ -46,6 +47,16 @@ No migrations: the DB is created with `EnsureCreated()`. After changing the `Job
 | TopDev | `sitemap-jobs.xml` → `jobs_desc_vi_page_N.xml` → job page JSON-LD `JobPosting` | Search results load from `api.topdev.vn`, whose robots.txt is `Disallow: /` — **do not call that API** |
 | VietnamWorks | POST `ms.vietnamworks.com/job-search/v1.0/search`, filter jobFunction parentId 5 (IT) | Listing HTML has only 5 SSR jobs. `ms.` host has no robots.txt (404 = allowed) |
 
+Company career sites:
+
+| Company | Method | Notes |
+|---|---|---|
+| TMA Solutions | HTML `tma.vn/tuyen-dung/viec-lam?page=N` | Hashed class names → match `[class$='_item']`. Page past the end returns **500**, so read the last page from the pager |
+| Axon Active | Wix blog RSS `careers.axonactive.com/blog-feed.xml` | Each job is a blog post; title starts with head count ("01 "); post categories = offices |
+| NAB | `nab.eightfold.ai/api/pcsx/search?domain=nab.com.au&location=Vietnam&start=N` | robots.txt is `Disallow: /` + allow-list; `/api/pcsx` and `/careers` are on it. 10/page. Bank → many non-IT roles |
+| Netcompany | HTML `netcompany.com/careers/vacancies/`, `a[href^='/job/']` | No robots.txt. One page with all ~170 jobs worldwide; only Vietnam cities are kept |
+| FPT Software | — **not crawled** | `career.fpt-software.com` answers every request (robots.txt included) with a Cloudflare bot challenge. Getting past it would mean evading bot protection — don't |
+
 ## Conventions
 
 - Every network call goes through `PoliteHttpClient`. Never use `HttpClient` directly in a source.
@@ -68,6 +79,10 @@ Crawling
 - **JSON-LD is the most stable source** on detail pages, but not every field is truthful: TopDev's `industry` is always
   "Information Technology", even for construction jobs.
 - **Sitemaps contain expired jobs** (TopDev ~30% 404). 404/410 is returned as `null`, not an error.
+- **Bot challenges are a "no":** a 403 with `cf-mitigated: challenge` on robots.txt is not "robots.txt missing"
+  (which RFC 9309 would treat as allow-all) — `PoliteHttpClient` treats it as disallow-all.
+- **Pagination ends differently per site:** 404, an empty page, a repeated page, or (TMA) HTTP 500. Prefer reading the
+  last page number / total count from the response over probing past the end.
 - **Redirects:** old TopCV category URLs 301 to new ones; robots is checked on the requested URL only, so use canonical URLs.
 - **Selectors break when sites redesign.** Each source yields nothing (not an exception) when its selector finds no cards —
   if a source suddenly returns 0 jobs, re-check the HTML first.
@@ -85,6 +100,9 @@ Classification
   TopCV / TopDev / VietnamWorks (~15% of TopCV, ~35% of TopDev in a 2026-10-15 sample).
 - **Non-IT title words need context:** a title starting "Tuyển dụng ..." means "Hiring ...", not an HR job;
   "kiến trúc sư hệ thống / giải pháp" is a system / solution architect, not a building architect.
+- **Plurals:** "Software Developers" must match `developer` — keyword regexes allow an optional trailing `s`.
+- **Use the department / category field** when the source has one (NAB `department`, VietnamWorks job function):
+  "Head of Engineering" alone says little, "Head of Engineering" in "Software Engineering" is IT.
 - "engineer" alone is not proof of IT (process / civil / sales engineer); "developer" / "lập trình viên" is.
 - "Product/Project Manager" is a role, not a Manager seniority level.
 - After changing rules, call `POST /api/jobs/reclassify` instead of re-crawling.
