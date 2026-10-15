@@ -41,6 +41,7 @@ builder.Services.AddSingleton<IJobSource, VietnamWorksSource>();
 // Company career sites
 builder.Services.AddSingleton<IJobSource, TmaSource>();
 builder.Services.AddSingleton<IJobSource, AxonActiveSource>();
+builder.Services.AddSingleton<IJobSource, NabSource>();
 builder.Services.AddSingleton<CrawlCoordinator>();
 
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
